@@ -41,6 +41,7 @@ export const App: React.FC = () => {
   const [startPopularity, setStartPopularity] = useState(0.2);
   const [rent, setRent] = useState(50_000);
   const [salary, setSalary] = useState(50_000);
+  const [taxes, setTaxes] = useState(10);
   const [buyerWallet, setBuyerWallet] = useState([500, 2_000]);
   const [incidentCost, setIncidentCost] = useState([50_000, 200_000]);
   const [advertisingCost, setAdvertisingCost] = useState(50_000);
@@ -80,6 +81,7 @@ export const App: React.FC = () => {
   const [expensesData, setExpensesData] = useState([] as number[]);
   const [incomeData, setIncomeData] = useState([] as number[]);
   const [revenueData, setRevenueData] = useState([] as number[]);
+  const [totalRevenueData, setTotalRevenueData] = useState([] as number[]);
 
   const getTodayClientsAmount = (popularity: number) => {
     return Math.floor(popularity * 300);
@@ -151,16 +153,23 @@ export const App: React.FC = () => {
       return res;
     };
 
-    const getTodayExpenses = (todaySales: number) => {
+    const getTodayExpenses = (todayIncome: number) => {
       let result = 0;
 
       // Стоимость продуктов
-      result += todaySales * 0.5; // Тут не учтена динамическая наценка
+      result += todayIncome * 0.5; // Тут не учтена динамическая наценка
 
       // Зарплата и аренда
       if (day % 30 === 0) {
         result += salary;
         result += rent;
+
+        if (day !== 0) {
+          const monthRevenueData = revenueData.slice(day - 29, day);
+          const monthRevenue = monthRevenueData.reduce((acc, cur) => acc + cur);
+
+          result += monthRevenue * (taxes / 100);
+        }
       }
 
       // Тут стоимость инцидентов
@@ -183,7 +192,7 @@ export const App: React.FC = () => {
       timerRef.current = setTimeout(() => {
         const todayIncome = getTodayIncome() + (day === 0 ? startCapital : 0);
         const todayExpenses = getTodayExpenses(todayIncome);
-        // const todayRevenue = getRevenue(todayIncome, todayExpenses);
+        const todayRevenue = getRevenue(todayIncome, todayExpenses);
 
         flushSync(() => {
           setDay((p) => p + 1);
@@ -193,12 +202,12 @@ export const App: React.FC = () => {
 
           setExpensesData((p) => [...p, todayExpenses]);
           setIncomeData((p) => [...p, todayIncome]);
-          // setRevenueData((p) => [...p, todayRevenue]);
+          setRevenueData((p) => [...p, todayRevenue]);
         });
 
         const totalRevenue = getRevenue(income, expenses);
 
-        setRevenueData((p) => [...p, totalRevenue]);
+        setTotalRevenueData((p) => [...p, totalRevenue]);
 
         if (
           totalRevenue > 0 &&
@@ -290,6 +299,18 @@ export const App: React.FC = () => {
                   max={1_000_000}
                   values={[salary]}
                   onChange={(v) => setSalary(v[0])}
+                />
+              </div>
+            </label>
+
+            <label className="flex items-center whitespace-nowrap gap-4">
+              Налоги (%):
+              <div className="max-w-xs w-full">
+                <RangeSlider
+                  min={0}
+                  max={100}
+                  values={[taxes]}
+                  onChange={(v) => setTaxes(v[0])}
                 />
               </div>
             </label>
@@ -437,7 +458,7 @@ export const App: React.FC = () => {
               datasets: [
                 {
                   label: "Прибыль",
-                  data: revenueData,
+                  data: totalRevenueData,
                   borderColor: "rgb(53, 162, 53)",
                   backgroundColor: "rgba(53, 162, 53, 0.5)",
                 },
@@ -474,22 +495,3 @@ export const App: React.FC = () => {
     </div>
   );
 };
-
-/**
- * Пиццерия
- * Входные данные:
- * - Аренда помещения (раз в месяц)
- * - Зарплата сотрудникам
- * - Стартовый капитал
- * - Стартовая популярность
- *
- * Что будет происходить:
- * - Продажа пиццы, напитков, салатов, закусок
- *
- * Выходные данные:
- * - Расходы expenses
- * - Доходы income
- * - Прибыль revenue
- * - Количество посетителей (популярность)
- *
- */
