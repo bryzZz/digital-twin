@@ -361,7 +361,7 @@ export const App: React.FC = () => {
             </label>
 
             <label className="flex items-center whitespace-nowrap gap-4">
-              Стоимость разрешения инцидентов:
+              Стоимость починки:
               <div className="max-w-xs w-full">
                 <RangeSlider
                   min={50_000}
