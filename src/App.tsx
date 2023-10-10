@@ -39,6 +39,7 @@ const format = new Intl.NumberFormat("ru-RU", {
 export const App: React.FC = () => {
   const [startCapital, setStartCapital] = useState(100_000);
   const [startPopularity, setStartPopularity] = useState(0.2);
+  const [desiredPopularity, setDesiredPopularity] = useState(0.5);
   const [rent, setRent] = useState(50_000);
   const [salary, setSalary] = useState(50_000);
   const [taxes, setTaxes] = useState(10);
@@ -82,8 +83,12 @@ export const App: React.FC = () => {
   const [incomeData, setIncomeData] = useState([] as number[]);
   const [revenueData, setRevenueData] = useState([] as number[]);
   const [totalRevenueData, setTotalRevenueData] = useState([] as number[]);
+  const [popularityData, setPopularityData] = useState([] as number[]);
+  const [unservedClientsData, setUnservedClientsData] = useState(
+    [] as number[]
+  );
 
-  const getTodayClientsAmount = (popularity: number) => {
+  const getClientsAmount = (popularity: number) => {
     return Math.floor(popularity * 300);
   };
 
@@ -121,13 +126,14 @@ export const App: React.FC = () => {
     );
   };
 
+  const maxClients = getClientsAmount(desiredPopularity);
   const todayExpenses = expensesData[expensesData.length - 1] ?? 0;
   const todayIncome = incomeData[incomeData.length - 1] ?? 0;
   const todayRevenue = getRevenue(todayIncome, todayExpenses);
 
   useEffect(() => {
     const getTodayIncome = () => {
-      const clientsAmount = getTodayClientsAmount(popularity);
+      const clientsAmount = Math.min(getClientsAmount(popularity), maxClients);
       const sortedProductsByPrice = [...products].sort(
         (a, b) => b.price - a.price
       );
@@ -206,17 +212,27 @@ export const App: React.FC = () => {
         });
 
         const totalRevenue = getRevenue(income, expenses);
+        const todayUnservedClients = Math.max(
+          getClientsAmount(popularity) - maxClients,
+          0
+        );
 
-        setTotalRevenueData((p) => [...p, totalRevenue]);
+        flushSync(() => {
+          setTotalRevenueData((p) => [...p, totalRevenue]);
+          setPopularity((p) => +(p - todayUnservedClients * 0.001).toFixed(2));
 
-        if (
-          totalRevenue > 0 &&
-          totalRevenue > advertisingCost * 10 &&
-          day % 120 === 0
-        ) {
-          setPopularity((p) => +(p + 0.1).toFixed(2));
-          setExpenses((p) => p + advertisingCost);
-        }
+          if (
+            day % 14 === 0 &&
+            popularity < desiredPopularity &&
+            totalRevenue > salary + rent
+          ) {
+            setPopularity((p) => +(p + 0.1).toFixed(2));
+            setExpenses((p) => p + advertisingCost);
+          }
+        });
+
+        setPopularityData((p) => [...p, popularity]);
+        setUnservedClientsData((p) => [...p, todayUnservedClients]);
       }, daySpeed);
     } else {
       if (timerRef.current !== null) {
@@ -243,6 +259,10 @@ export const App: React.FC = () => {
     buyerWallet,
     incidentCost,
     startCapital,
+    revenueData,
+    taxes,
+    desiredPopularity,
+    maxClients,
   ]);
 
   return (
@@ -275,6 +295,19 @@ export const App: React.FC = () => {
                   step={0.1}
                   values={[startPopularity]}
                   onChange={(v) => setStartPopularity(v[0])}
+                />
+              </div>
+            </label>
+
+            <label className="flex items-center whitespace-nowrap gap-4">
+              Желаемая популярность:
+              <div className="max-w-xs w-full">
+                <RangeSlider
+                  min={0.1}
+                  max={1}
+                  step={0.1}
+                  values={[desiredPopularity]}
+                  onChange={(v) => setDesiredPopularity(v[0])}
                 />
               </div>
             </label>
@@ -403,7 +436,7 @@ export const App: React.FC = () => {
         <p>Доходы всего: {format(income)}</p>
         <p>Прибыль всего: {format(getRevenue(income, expenses))}</p>
         <p>Популярность: {popularity}</p>
-        <p>Клиентов сегодня: {getTodayClientsAmount(popularity)}</p>
+        <p>Клиентов сегодня: {getClientsAmount(popularity)}</p>
         <p>Расходы сегодня: {format(todayExpenses)}</p>
         <p>Доходы сегодня: {format(todayIncome)}</p>
         <p>Прибыль сегодня: {format(todayRevenue)}</p>
@@ -486,6 +519,44 @@ export const App: React.FC = () => {
                   data: incomeData,
                   borderColor: "rgb(53, 162, 235)",
                   backgroundColor: "rgba(53, 162, 235, 0.5)",
+                },
+              ],
+            }}
+          />
+        </div>
+
+        <div>
+          <Line
+            options={{
+              responsive: true,
+            }}
+            data={{
+              labels: new Array(day).fill(0).map((_, i) => i),
+              datasets: [
+                {
+                  label: "Уровень популярности",
+                  data: popularityData,
+                  borderColor: "rgb(53, 162, 235)",
+                  backgroundColor: "rgba(53, 162, 235, 0.5)",
+                },
+              ],
+            }}
+          />
+        </div>
+
+        <div>
+          <Line
+            options={{
+              responsive: true,
+            }}
+            data={{
+              labels: new Array(day).fill(0).map((_, i) => i),
+              datasets: [
+                {
+                  label: "Необслуженные клиенты",
+                  data: unservedClientsData,
+                  borderColor: "rgb(255, 99, 132)",
+                  backgroundColor: "rgba(255, 99, 132, 0.5)",
                 },
               ],
             }}
